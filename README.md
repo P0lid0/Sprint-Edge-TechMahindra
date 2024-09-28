@@ -17,7 +17,7 @@ Detecção de movimento com o sensor PIR.
 Alerta sonoro através do buzzer ao detectar uma volta completa.
 Comunicação Wi-Fi com um servidor remoto para monitoramento em tempo real.
 
-Arquitetura Proposta
+Arquitetura Proposta:
 Dispositivos IoT:
 DHT22: Sensor de temperatura e umidade que coleta dados da pista.
 PIR: Sensor de movimento que detecta a passagem de um objeto (carro) para indicar a conclusão de uma volta.
@@ -31,7 +31,7 @@ O dispositivo IoT coleta a temperatura e umidade da pista e envia os dados para 
 Quando o sensor PIR detecta movimento, o buzzer é ativado e uma mensagem é enviada ao servidor indicando a conclusão da volta.
 O servidor processa os dados e exibe as informações no front-end, alertando os operadores das condições da pista e o progresso das voltas.
 
-Recursos Necessários
+Recursos Necessários:
 Dispositivos IoT:
 Sensor DHT22: Para medir temperatura e umidade.
 Sensor PIR: Para detectar movimento.
