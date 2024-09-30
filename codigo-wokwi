@@ -1,0 +1,130 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <DHT.h>
+
+#define pirpin 12
+#define dhtpin 19
+#define buzzerpin 16
+#define DHTTYPE DHT22
+
+DHT dht(dhtpin, DHTTYPE);
+
+// Configurações de Wi-Fi
+const char* ssid = "Wokwi-GUEST";
+const char* password = "";
+
+// Configurações de MQTT
+const char* mqtt_server = "mqtt-dashboard.com";
+const int mqtt_port = 1883;  // Use a porta 1883, que é a porta padrão do MQTT sem TLS
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+float h;
+float t;
+int pir;
+
+const char* topic_temperature = "esp32/temperature"; // Tópico para temperatura
+const char* topic_humidity = "esp32/humidity";       // Tópico para umidade
+const char* topic_pir = "esp32/pir";                 // Tópico para PIR status
+
+void setup_wifi() {
+    delay(10);
+    Serial.println();
+    Serial.print("Conectando a ");
+    Serial.println(ssid);
+
+    // Conectar ao Wi-Fi
+    WiFi.begin(ssid, password);
+
+    // Aguarda a conexão
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+
+    Serial.println("");
+    Serial.println("WiFi conectado");
+    Serial.println("Endereço IP: ");
+    Serial.println(WiFi.localIP());
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+    Serial.print("Mensagem recebida [");
+    Serial.print(topic);
+    Serial.print("] ");
+    for (int i = 0; i < length; i++) {
+        Serial.print((char)payload[i]);
+    }
+    Serial.println();
+}
+
+void reconnect() {
+    // Tenta reconectar ao servidor MQTT
+    while (!client.connected()) {
+        Serial.print("Tentando conexão MQTT...");
+        String clientId = "ESP32Client-";
+        clientId += String(random(0xffff), HEX);
+        if (client.connect(clientId.c_str())) {
+            Serial.println("Conectado");
+            // Aqui você pode assinar tópicos, se necessário
+            // client.subscribe("esp32/algum_topico");
+        } else {
+            Serial.print("Falha, rc=");
+            Serial.print(client.state());
+            Serial.println(" Tentando novamente em 5 segundos");
+            delay(5000);
+        }
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+    pinMode(pirpin, INPUT);
+    pinMode(buzzerpin, OUTPUT);
+    dht.begin();  // Inicializa o sensor DHT
+
+    setup_wifi(); // Inicializa a conexão Wi-Fi
+    client.setServer(mqtt_server, mqtt_port);  // Configura o servidor MQTT
+    client.setCallback(callback);  // Define a função callback para o MQTT
+}
+
+void loop() {
+    if (!client.connected()) {
+        reconnect();  // Reconnecta ao servidor MQTT se desconectado
+    }
+    client.loop();  // Mantém a conexão MQTT ativa
+
+    // Ler valores do DHT e PIR
+    t = dht.readTemperature();
+    h = dht.readHumidity();
+    pir = digitalRead(pirpin);
+
+    // Verifica se a leitura foi bem-sucedida
+    if (!isnan(t) && !isnan(h)) {
+        // Publicar temperatura e umidade no MQTT
+        char tempStr[8], humStr[8], pirStr[8];
+        dtostrf(t, 6, 2, tempStr);
+        dtostrf(h, 6, 2, humStr);
+        itoa(pir, pirStr, 10);
+
+        client.publish(topic_temperature, tempStr);  // Publica a temperatura
+        client.publish(topic_humidity, humStr);      // Publica a umidade
+        client.publish(topic_pir, pirStr);           // Publica o estado do PIR
+
+        Serial.print("Temperatura: ");
+        Serial.print(tempStr);
+        Serial.print("°C, Umidade: ");
+        Serial.print(humStr);
+        Serial.print("%, PIR: ");
+        Serial.println(pirStr);
+
+        if (pir == HIGH) {
+            tone(buzzerpin, 262, 1000);  // Ativa o buzzer se houver movimento
+        } else {
+            noTone(buzzerpin);  // Desativa o buzzer se não houver movimento
+        }
+    }
+
+    delay(2000);  // Intervalo entre publicações
+}
